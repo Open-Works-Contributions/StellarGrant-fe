@@ -609,7 +609,15 @@ mod tests {
             let updated_grant = Storage::get_grant(&env, grant_id).unwrap();
             assert_eq!(updated_grant.status, GrantStatus::Completed);
             assert_eq!(updated_grant.escrow_balance, 0); // should be cleared
+
+            for i in 0..2 {
+                let updated_milestone = Storage::get_milestone(&env, grant_id, i).unwrap();
+                assert_eq!(updated_milestone.state, MilestoneState::Paid);
+            }
         });
+
+        let result = client.try_grant_complete(&grant_id);
+        assert_eq!(result, Err(Ok(ContractError::InvalidState.into())));
     }
 
     #[test]

@@ -64,7 +64,8 @@ pub enum MilestoneState {
     Pending = 0,
     Submitted = 1,
     Approved = 2,
-    Rejected = 3,
+    Paid = 3,
+    Rejected = 4,
 }
 
 #[contracttype]

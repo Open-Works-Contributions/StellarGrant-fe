@@ -33,6 +33,15 @@ pub struct MilestoneStatusChanged {
 
 #[contractevent]
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MilestonePaid {
+    pub grant_id: u64,
+    pub milestone_idx: u32,
+    pub amount: i128,
+    pub timestamp: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GrantCancelled {
     pub grant_id: u64,
     pub owner: Address,
@@ -277,6 +286,21 @@ impl Events {
             grant_id,
             milestone_idx,
             new_state,
+            timestamp: env.ledger().timestamp(),
+        };
+        event.publish(env);
+    }
+
+    pub fn emit_milestone_paid(
+        env: &Env,
+        grant_id: u64,
+        milestone_idx: u32,
+        amount: i128,
+    ) {
+        let event = MilestonePaid {
+            grant_id,
+            milestone_idx,
+            amount,
             timestamp: env.ledger().timestamp(),
         };
         event.publish(env);

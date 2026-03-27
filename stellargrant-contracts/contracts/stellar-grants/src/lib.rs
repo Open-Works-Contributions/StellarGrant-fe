@@ -385,7 +385,7 @@ impl StellarGrantsContract {
         let mut approved_count = 0;
         for milestone_idx in 0..total_milestones {
             if let Some(milestone) = Storage::get_milestone(env, grant_id, milestone_idx) {
-                if milestone.state != MilestoneState::Approved {
+                if milestone.state != MilestoneState::Approved && milestone.state != MilestoneState::Paid {
                     return Err(ContractError::NotAllMilestonesApproved);
                 }
                 total_paid += milestone.amount;
@@ -456,6 +456,30 @@ impl StellarGrantsContract {
                             refund_amount,
                         );
                     }
+                }
+            }
+        }
+
+        // Mark all approved milestones as paid
+        for milestone_idx in 0..grant.total_milestones {
+            if let Some(mut milestone) = Storage::get_milestone(env, grant_id, milestone_idx) {
+                if milestone.state == MilestoneState::Approved {
+                    milestone.state = MilestoneState::Paid;
+                    milestone.status_updated_at = env.ledger().timestamp();
+                    Storage::set_milestone(env, grant_id, milestone_idx, &milestone);
+
+                    Events::milestone_status_changed(
+                        env,
+                        grant_id,
+                        milestone_idx,
+                        MilestoneState::Paid,
+                    );
+                    Events::emit_milestone_paid(
+                        env,
+                        grant_id,
+                        milestone_idx,
+                        milestone.amount,
+                    );
                 }
             }
         }
@@ -1013,7 +1037,9 @@ fn apply_milestone_submission(
     }
 
     if let Some(existing) = Storage::get_milestone(env, grant_id, milestone_idx) {
-        if existing.state == MilestoneState::Submitted || existing.state == MilestoneState::Approved
+        if existing.state == MilestoneState::Submitted
+            || existing.state == MilestoneState::Approved
+            || existing.state == MilestoneState::Paid
         {
             return Err(ContractError::MilestoneAlreadySubmitted);
         }
