@@ -1883,7 +1883,6 @@ mod tests {
         });
     }
 
-
     #[test]
     fn test_reentrancy_guard_allows_sequential_grant_funds() {
         let env = Env::default();
