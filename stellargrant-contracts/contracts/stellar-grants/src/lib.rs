@@ -779,6 +779,10 @@ impl StellarGrantsContract {
         let mut milestone = Storage::get_milestone(&env, grant_id, milestone_idx)
             .ok_or(ContractError::MilestoneNotSubmitted)?;
 
+        if grant.status != GrantStatus::Active {
+            return Err(ContractError::InvalidState);
+        }
+
         if milestone.state == MilestoneState::CommunityReview {
             if env.ledger().timestamp() < milestone.submission_timestamp + COMMUNITY_REVIEW_PERIOD {
                 return Err(ContractError::CommunityReviewPeriod);
@@ -1332,6 +1336,48 @@ impl StellarGrantsContract {
         Storage::set_grant(&env, grant_id, &grant);
 
         Events::emit_reviewer_removed(&env, grant_id, owner, old_reviewer);
+        Ok(())
+    }
+
+    /// Pause an active grant. While paused, no funding, milestone submissions,
+    /// or milestone payouts are allowed. Only the grant owner or global admin may call this.
+    pub fn grant_pause(env: Env, grant_id: u64, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+        let mut grant = Storage::get_grant(&env, grant_id).ok_or(ContractError::GrantNotFound)?;
+
+        let is_owner = grant.owner == caller;
+        let is_admin = Storage::get_global_admin(&env) == Some(caller.clone());
+        if !is_owner && !is_admin {
+            return Err(ContractError::Unauthorized);
+        }
+        if grant.status != GrantStatus::Active {
+            return Err(ContractError::InvalidState);
+        }
+
+        grant.status = GrantStatus::Paused;
+        Storage::set_grant(&env, grant_id, &grant);
+        Events::emit_grant_paused(&env, grant_id, caller);
+        Ok(())
+    }
+
+    /// Resume a paused grant, returning it to Active status.
+    /// Only the grant owner or global admin may call this.
+    pub fn grant_resume(env: Env, grant_id: u64, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+        let mut grant = Storage::get_grant(&env, grant_id).ok_or(ContractError::GrantNotFound)?;
+
+        let is_owner = grant.owner == caller;
+        let is_admin = Storage::get_global_admin(&env) == Some(caller.clone());
+        if !is_owner && !is_admin {
+            return Err(ContractError::Unauthorized);
+        }
+        if grant.status != GrantStatus::Paused {
+            return Err(ContractError::InvalidState);
+        }
+
+        grant.status = GrantStatus::Active;
+        Storage::set_grant(&env, grant_id, &grant);
+        Events::emit_grant_resumed(&env, grant_id, caller);
         Ok(())
     }
 

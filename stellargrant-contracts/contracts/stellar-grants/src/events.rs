@@ -554,6 +554,26 @@ impl Events {
         };
         event.publish(env);
     }
+
+    pub fn emit_grant_paused(env: &Env, grant_id: u64, actor: Address) {
+        let event = GrantPaused {
+            event_version: EVENT_VERSION,
+            grant_id,
+            actor,
+            timestamp: env.ledger().timestamp(),
+        };
+        event.publish(env);
+    }
+
+    pub fn emit_grant_resumed(env: &Env, grant_id: u64, actor: Address) {
+        let event = GrantResumed {
+            event_version: EVENT_VERSION,
+            grant_id,
+            actor,
+            timestamp: env.ledger().timestamp(),
+        };
+        event.publish(env);
+    }
 }
 
 #[contractevent]
@@ -615,5 +635,23 @@ pub struct ReviewerRemoved {
     pub grant_id: u64,
     pub owner: Address,
     pub old_reviewer: Address,
+    pub timestamp: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GrantPaused {
+    pub event_version: u32,
+    pub grant_id: u64,
+    pub actor: Address,
+    pub timestamp: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GrantResumed {
+    pub event_version: u32,
+    pub grant_id: u64,
+    pub actor: Address,
     pub timestamp: u64,
 }

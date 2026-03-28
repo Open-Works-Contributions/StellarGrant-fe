@@ -116,6 +116,8 @@ pub enum GrantStatus {
     Completed = 3,
     /// Cancellation requested but grace period has not elapsed yet.
     CancellationPending = 4,
+    /// Grant is temporarily paused; no funding, submissions, or payouts allowed.
+    Paused = 5,
 }
 
 #[contracttype]
