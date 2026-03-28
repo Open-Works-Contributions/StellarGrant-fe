@@ -51,7 +51,9 @@ impl StellarGrantsContract {
         if !(is_owner || is_reviewer) {
             return Err(ContractError::Unauthorized);
         }
-        if milestone.state != MilestoneState::Submitted && milestone.state != MilestoneState::Approved {
+        if milestone.state != MilestoneState::Submitted
+            && milestone.state != MilestoneState::Approved
+        {
             return Err(ContractError::InvalidState);
         }
         milestone.state = MilestoneState::Disputed;
@@ -100,12 +102,7 @@ impl StellarGrantsContract {
             grant.escrow_balance -= grant.milestone_amount;
             grant.milestones_paid_out += 1;
             Storage::set_grant(&env, grant_id, &grant);
-            Events::emit_milestone_paid(
-                &env,
-                grant_id,
-                milestone_idx,
-                grant.milestone_amount,
-            );
+            Events::emit_milestone_paid(&env, grant_id, milestone_idx, grant.milestone_amount);
         } else {
             // Reject: refund milestone amount to funders (pro-rata)
             let total_refundable = grant.milestone_amount;

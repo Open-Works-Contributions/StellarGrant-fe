@@ -1,5 +1,5 @@
 use soroban_sdk::{testutils::Address as _, token, Address, Env, String, Vec};
-use stellar_grants::{StellarGrantsContractClient, MilestoneState};
+use stellar_grants::{MilestoneState, StellarGrantsContractClient};
 
 #[test]
 fn test_dispute_and_resolve_flow() {
@@ -10,7 +10,9 @@ fn test_dispute_and_resolve_flow() {
     let owner = Address::generate(&env);
     let reviewer = Address::generate(&env);
     let token_admin_addr = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(token_admin_addr.clone()).address();
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin_addr.clone())
+        .address();
     let token_admin = token::StellarAssetClient::new(&env, &token);
     let contract_id = env.register_contract(None, stellar_grants::StellarGrantsContract);
     let client = StellarGrantsContractClient::new(&env, &contract_id);
@@ -39,24 +41,9 @@ fn test_dispute_and_resolve_flow() {
         &String::from_str(&env, "Milestone 1"),
         &String::from_str(&env, "proof"),
     );
-    client.milestone_vote(
-        &grant_id,
-        &0,
-        &reviewer,
-        &true,
-        &None,
-    );
-    client.dispute_milestone(
-        &grant_id,
-        &0,
-        &owner,
-    );
-    client.resolve_dispute(
-        &council,
-        &grant_id,
-        &0,
-        &true,
-    );
+    client.milestone_vote(&grant_id, &0, &reviewer, &true, &None);
+    client.dispute_milestone(&grant_id, &0, &owner);
+    client.resolve_dispute(&council, &grant_id, &0, &true);
     let milestone = client.get_milestone(&grant_id, &0);
     assert_eq!(milestone.state, MilestoneState::Resolved);
 }
@@ -70,7 +57,9 @@ fn test_vote_blocked_during_dispute() {
     let owner = Address::generate(&env);
     let reviewer = Address::generate(&env);
     let token_admin_addr = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(token_admin_addr.clone()).address();
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin_addr.clone())
+        .address();
     let token_admin = token::StellarAssetClient::new(&env, &token);
     let contract_id = env.register_contract(None, stellar_grants::StellarGrantsContract);
     let client = StellarGrantsContractClient::new(&env, &contract_id);
@@ -99,26 +88,10 @@ fn test_vote_blocked_during_dispute() {
         &String::from_str(&env, "Milestone 1"),
         &String::from_str(&env, "proof"),
     );
-    client.milestone_vote(
-        &grant_id,
-        &0,
-        &reviewer,
-        &true,
-        &None,
-    );
-    client.dispute_milestone(
-        &grant_id,
-        &0,
-        &owner,
-    );
+    client.milestone_vote(&grant_id, &0, &reviewer, &true, &None);
+    client.dispute_milestone(&grant_id, &0, &owner);
     // This should panic
-    client.milestone_vote(
-        &grant_id,
-        &0,
-        &reviewer,
-        &true,
-        &None,
-    );
+    client.milestone_vote(&grant_id, &0, &reviewer, &true, &None);
 }
 
 #[test]
@@ -130,7 +103,9 @@ fn test_only_council_can_resolve_dispute() {
     let owner = Address::generate(&env);
     let reviewer = Address::generate(&env);
     let token_admin_addr = Address::generate(&env);
-    let token = env.register_stellar_asset_contract_v2(token_admin_addr.clone()).address();
+    let token = env
+        .register_stellar_asset_contract_v2(token_admin_addr.clone())
+        .address();
     let token_admin = token::StellarAssetClient::new(&env, &token);
     let contract_id = env.register_contract(None, stellar_grants::StellarGrantsContract);
     let client = StellarGrantsContractClient::new(&env, &contract_id);
@@ -159,23 +134,8 @@ fn test_only_council_can_resolve_dispute() {
         &String::from_str(&env, "Milestone 1"),
         &String::from_str(&env, "proof"),
     );
-    client.milestone_vote(
-        &grant_id,
-        &0,
-        &reviewer,
-        &true,
-        &None,
-    );
-    client.dispute_milestone(
-        &grant_id,
-        &0,
-        &owner,
-    );
+    client.milestone_vote(&grant_id, &0, &reviewer, &true, &None);
+    client.dispute_milestone(&grant_id, &0, &owner);
     // This should panic (not council)
-    client.resolve_dispute(
-        &owner,
-        &grant_id,
-        &0,
-        &true,
-    );
+    client.resolve_dispute(&owner, &grant_id, &0, &true);
 }
