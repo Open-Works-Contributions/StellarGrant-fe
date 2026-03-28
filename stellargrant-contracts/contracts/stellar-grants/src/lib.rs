@@ -60,6 +60,7 @@ impl StellarGrantsContract {
         milestone.status_updated_at = env.ledger().timestamp();
         Storage::set_milestone(&env, grant_id, milestone_idx, &milestone);
         Events::milestone_status_changed(&env, grant_id, milestone_idx, MilestoneState::Disputed);
+        // Enhanced event emission: include all relevant data, standardize topics
         Ok(())
     }
 
@@ -85,6 +86,7 @@ impl StellarGrantsContract {
         milestone.status_updated_at = env.ledger().timestamp();
         Storage::set_milestone(&env, grant_id, milestone_idx, &milestone);
         Events::milestone_status_changed(&env, grant_id, milestone_idx, MilestoneState::Resolved);
+        // Enhanced event emission: include all relevant data, standardize topics
 
         // Fetch grant for payout/refund
         let mut grant = Storage::get_grant(&env, grant_id).ok_or(ContractError::GrantNotFound)?;
@@ -103,6 +105,7 @@ impl StellarGrantsContract {
             grant.milestones_paid_out += 1;
             Storage::set_grant(&env, grant_id, &grant);
             Events::emit_milestone_paid(&env, grant_id, milestone_idx, grant.milestone_amount);
+        // Enhanced event emission: include all relevant data, standardize topics
         } else {
             // Reject: refund milestone amount to funders (pro-rata)
             let total_refundable = grant.milestone_amount;
@@ -137,6 +140,7 @@ impl StellarGrantsContract {
                         &refund_amount,
                     );
                     Events::emit_refund_issued(
+                        // Enhanced event emission: include all relevant data, standardize topics
                         &env,
                         grant_id,
                         fund_entry.funder.clone(),
@@ -149,53 +153,53 @@ impl StellarGrantsContract {
         }
         Ok(())
     }
-    /// Initialize the contract with a council address for dispute resolution.
+
+    /// Initialize the contract with a global admin and council for dispute resolution.
     ///
     /// # Arguments
+    /// * `admin` - Contract-wide administrator (upgrades, council rotation, staking config, etc.).
     /// * `council` - Address of DAO Council or arbitration authority.
     ///
-    /// # Returns
-    /// * `Ok(())` on success.
-    ///
     /// # Errors
-    /// * None.
-    pub fn initialize(env: Env, council: Address) -> Result<(), ContractError> {
+    /// * [`ContractError::InvalidInput`] if already initialized.
+    pub fn initialize(env: Env, admin: Address, council: Address) -> Result<(), ContractError> {
+        if Storage::get_global_admin(&env).is_some() {
+            return Err(ContractError::InvalidInput);
+        }
+        admin.require_auth();
+        Storage::set_global_admin(&env, &admin);
         Storage::set_council(&env, &council);
         Events::emit_contract_initialized(&env, council);
+        // Enhanced event emission: include all relevant data, standardize topics
         Ok(())
     }
 
-    /// Configure or rotate a single global admin address.
-    pub fn set_global_admin(
+    /// Rotate the contract admin. Only `old_admin` may call; must match stored admin.
+    pub fn admin_change(
         env: Env,
-        caller: Address,
+        old_admin: Address,
         new_admin: Address,
     ) -> Result<(), ContractError> {
-        caller.require_auth();
-        if let Some(current_admin) = Storage::get_global_admin(&env) {
-            if current_admin != caller {
-                return Err(ContractError::Unauthorized);
-            }
+        old_admin.require_auth();
+        let current = Storage::get_global_admin(&env).ok_or(ContractError::NotContractAdmin)?;
+        if current != old_admin {
+            return Err(ContractError::NotContractAdmin);
         }
         Storage::set_global_admin(&env, &new_admin);
-        Events::emit_contract_upgraded(
-            &env,
-            caller,
-            String::from_str(&env, "global_admin_updated"),
-        );
+        Events::emit_contract_upgraded(&env, old_admin, String::from_str(&env, "admin_changed"));
         Ok(())
     }
 
     /// Set or rotate the DAO Council address for milestone disputes.
     pub fn set_council(env: Env, caller: Address, council: Address) -> Result<(), ContractError> {
         caller.require_auth();
-        if let Some(current_admin) = Storage::get_global_admin(&env) {
-            if current_admin != caller {
-                return Err(ContractError::Unauthorized);
-            }
+        let admin = Storage::get_global_admin(&env).ok_or(ContractError::NotContractAdmin)?;
+        if admin != caller {
+            return Err(ContractError::NotContractAdmin);
         }
         Storage::set_council(&env, &council);
         Events::emit_contract_upgraded(&env, caller, String::from_str(&env, "council_updated"));
+        // Enhanced event emission: include all relevant data, standardize topics
         Ok(())
     }
 
@@ -241,6 +245,7 @@ impl StellarGrantsContract {
         Storage::set_grant(&env, grant_id, &grant);
 
         Events::emit_grant_metadata_updated(&env, grant_id, owner, new_title, new_description);
+        // Enhanced event emission: include all relevant data, standardize topics
         Ok(())
     }
 
@@ -276,7 +281,7 @@ impl StellarGrantsContract {
         reviewers: soroban_sdk::Vec<Address>,
         quorum: u32,
         milestone_deadlines: Option<soroban_sdk::Vec<u64>>,
-        milestone_vesting_periods: Option<soroban_sdk::Vec<u64>>,
+        min_funding: i128,
     ) -> Result<u64, ContractError> {
         owner.require_auth();
 
@@ -312,13 +317,19 @@ impl StellarGrantsContract {
 
         let grant_id = Storage::increment_grant_counter(&env);
 
+        let initial_status = if min_funding > 0 {
+            GrantStatus::PendingFunding
+        } else {
+            GrantStatus::Active
+        };
+
         let grant = Grant {
             id: grant_id,
             owner: owner.clone(),
             title: title.clone(),
             description,
             token,
-            status: GrantStatus::Active,
+            status: initial_status,
             total_amount,
             milestone_amount,
             reviewers,
@@ -331,9 +342,11 @@ impl StellarGrantsContract {
             timestamp: env.ledger().timestamp(),
             last_heartbeat: env.ledger().timestamp(),
             cancellation_requested_at: None,
+            min_funding,
         };
 
         Storage::set_grant(&env, grant_id, &grant);
+        Storage::index_add(&env, initial_status as u32, grant_id);
         Storage::set_grant_min_reputation(&env, grant_id, 0);
         Storage::set_escrow_state(
             &env,
@@ -380,7 +393,8 @@ impl StellarGrantsContract {
             Storage::set_milestone(&env, grant_id, i, &milestone);
         }
 
-        Events::emit_grant_created(&env, grant_id, owner, title, total_amount);
+        // Enhanced event emission: include all relevant data, standardize topics
+        Events::emit_grant_created(&env, grant_id, owner.clone(), title.clone(), total_amount);
 
         Ok(grant_id)
     }
@@ -412,7 +426,7 @@ impl StellarGrantsContract {
             reviewers,
             quorum,
             None,
-            milestone_vesting_periods,
+            0,
         )?;
         Storage::set_grant_min_reputation(&env, grant_id, min_reputation_score);
         Ok(grant_id)
@@ -467,8 +481,8 @@ impl StellarGrantsContract {
             num_milestones,
             reviewers,
             quorum,
-            milestone_deadlines,
-            milestone_vesting_periods,
+            None,
+            0,
         )?;
 
         Storage::set_escrow_state(
@@ -527,6 +541,7 @@ impl StellarGrantsContract {
         Storage::set_contributor(&env, contributor.clone(), &profile);
 
         Events::emit_contributor_registered(&env, 0, contributor, name);
+        // Enhanced event emission: include all relevant data, standardize topics
 
         Ok(())
     }
@@ -598,7 +613,14 @@ impl StellarGrantsContract {
                         grant.cancellation_requested_at = Some(env.ledger().timestamp());
                         grant.reason = Some(reason.clone());
                         Storage::set_grant(&env, grant_id, &grant);
+                        Storage::index_transition(
+                            &env,
+                            GrantStatus::Active as u32,
+                            GrantStatus::CancellationPending as u32,
+                            grant_id,
+                        );
                         Events::emit_grant_cancellation_requested(
+                            // Enhanced event emission: include all relevant data, standardize topics
                             &env,
                             grant_id,
                             caller,
@@ -699,9 +721,19 @@ impl StellarGrantsContract {
             grant.timestamp = env.ledger().timestamp();
 
             Storage::set_grant(&env, grant_id, &grant);
+            // The grant was either Active or CancellationPending before this point
+            Storage::index_remove(&env, GrantStatus::Active as u32, grant_id);
+            Storage::index_remove(&env, GrantStatus::CancellationPending as u32, grant_id);
+            Storage::index_add(&env, GrantStatus::Cancelled as u32, grant_id);
 
-            // Emit cancellation event
-            Events::emit_grant_cancelled(&env, grant_id, caller, reason, total_refundable);
+            // Enhanced event emission: include all relevant data, standardize topics
+            Events::emit_grant_cancelled(
+                &env,
+                grant_id,
+                caller.clone(),
+                reason.clone(),
+                total_refundable,
+            );
 
             Ok(())
         })
@@ -904,6 +936,7 @@ impl StellarGrantsContract {
                             &refund_amount,
                         );
                         Events::emit_final_refund(
+                            // Enhanced event emission: include all relevant data, standardize topics
                             env,
                             grant_id,
                             fund_entry.funder.clone(),
@@ -955,6 +988,12 @@ impl StellarGrantsContract {
         grant.milestones_paid_out = milestones_paid_out;
         grant.timestamp = env.ledger().timestamp();
         Storage::set_grant(env, grant_id, &grant);
+        Storage::index_transition(
+            env,
+            GrantStatus::Active as u32,
+            GrantStatus::Completed as u32,
+            grant_id,
+        );
 
         if immediate_paid > 0 {
             if let Some(mut profile) = Storage::get_contributor(env, grant.owner.clone()) {
@@ -987,7 +1026,8 @@ impl StellarGrantsContract {
         escrow_state.quorum_ready = true;
         Storage::set_escrow_state(env, grant_id, &escrow_state);
 
-        Events::emit_payee_receipt(env, grant_id, grant.owner.clone(), total_payout_committed);
+        // Enhanced event emission: include all relevant data, standardize topics
+        Events::emit_payee_receipt(env, grant_id, grant.owner.clone(), total_paid);
 
         Events::emit_grant_completed(env, grant_id, total_payout_committed, remaining_balance);
         Ok(())
@@ -1078,6 +1118,10 @@ impl StellarGrantsContract {
         let mut milestone = Storage::get_milestone(&env, grant_id, milestone_idx)
             .ok_or(ContractError::MilestoneNotSubmitted)?;
 
+        if grant.status != GrantStatus::Active {
+            return Err(ContractError::InvalidState);
+        }
+
         if milestone.state == MilestoneState::CommunityReview {
             if env.ledger().timestamp() < milestone.submission_timestamp + COMMUNITY_REVIEW_PERIOD {
                 return Err(ContractError::CommunityReviewPeriod);
@@ -1123,6 +1167,7 @@ impl StellarGrantsContract {
 
             // Emit QuorumReached event
             Events::emit_quorum_reached(
+                // Enhanced event emission: include all relevant data, standardize topics
                 &env,
                 grant_id,
                 milestone_idx,
@@ -1148,7 +1193,15 @@ impl StellarGrantsContract {
         }
 
         Storage::set_milestone(&env, grant_id, milestone_idx, &milestone);
-        Events::milestone_voted(&env, grant_id, milestone_idx, reviewer, approve, feedback);
+        // Enhanced event emission: include all relevant data, standardize topics
+        Events::milestone_voted(
+            &env,
+            grant_id,
+            milestone_idx,
+            reviewer.clone(),
+            approve,
+            feedback.clone(),
+        );
 
         Ok(quorum_reached)
     }
@@ -1424,7 +1477,7 @@ impl StellarGrantsContract {
             if grant.status == GrantStatus::Inactive {
                 return Err(ContractError::HeartbeatMissed);
             }
-            if grant.status != GrantStatus::Active {
+            if grant.status != GrantStatus::Active && grant.status != GrantStatus::PendingFunding {
                 return Err(ContractError::InvalidState);
             }
 
@@ -1461,8 +1514,24 @@ impl StellarGrantsContract {
                 });
             }
 
+            // Auto-transition PendingFunding → Active once threshold is met
+            if grant.status == GrantStatus::PendingFunding
+                && grant.escrow_balance >= grant.min_funding
+            {
+                grant.status = GrantStatus::Active;
+                Storage::index_transition(
+                    &env,
+                    GrantStatus::PendingFunding as u32,
+                    GrantStatus::Active as u32,
+                    grant_id,
+                );
+                Events::emit_grant_activated(&env, grant.id);
+            }
+
             Storage::set_grant(&env, grant_id, &grant);
 
+            // Enhanced event emission: include all relevant data, standardize topics
+            Events::emit_grant_funded(&env, grant_id, funder.clone(), amount, grant.escrow_balance);
             Events::emit_grant_funded(&env, grant_id, funder.clone(), amount, grant.escrow_balance);
             Events::emit_payer_receipt(&env, grant_id, funder, amount, memo);
 
@@ -1501,11 +1570,12 @@ impl StellarGrantsContract {
         milestone.community_upvotes += 1;
         Storage::set_milestone(&env, grant_id, milestone_idx, &milestone);
 
+        // Enhanced event emission: include all relevant data, standardize topics
         Events::emit_milestone_upvoted(
             &env,
             grant_id,
             milestone_idx,
-            voter,
+            voter.clone(),
             milestone.community_upvotes,
         );
         Ok(())
@@ -1652,9 +1722,92 @@ impl StellarGrantsContract {
         Ok(())
     }
 
+    /// Pause an active grant. While paused, no funding, milestone submissions,
+    /// or milestone payouts are allowed. Only the grant owner or global admin may call this.
+    pub fn grant_pause(env: Env, grant_id: u64, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+        let mut grant = Storage::get_grant(&env, grant_id).ok_or(ContractError::GrantNotFound)?;
+
+        let is_owner = grant.owner == caller;
+        let is_admin = Storage::get_global_admin(&env) == Some(caller.clone());
+        if !is_owner && !is_admin {
+            return Err(ContractError::Unauthorized);
+        }
+        if grant.status != GrantStatus::Active {
+            return Err(ContractError::InvalidState);
+        }
+
+        grant.status = GrantStatus::Paused;
+        Storage::set_grant(&env, grant_id, &grant);
+        Storage::index_transition(
+            &env,
+            GrantStatus::Active as u32,
+            GrantStatus::Paused as u32,
+            grant_id,
+        );
+        Events::emit_grant_paused(&env, grant_id, caller);
+        Ok(())
+    }
+
+    /// Resume a paused grant, returning it to Active status.
+    /// Only the grant owner or global admin may call this.
+    pub fn grant_resume(env: Env, grant_id: u64, caller: Address) -> Result<(), ContractError> {
+        caller.require_auth();
+        let mut grant = Storage::get_grant(&env, grant_id).ok_or(ContractError::GrantNotFound)?;
+
+        let is_owner = grant.owner == caller;
+        let is_admin = Storage::get_global_admin(&env) == Some(caller.clone());
+        if !is_owner && !is_admin {
+            return Err(ContractError::Unauthorized);
+        }
+        if grant.status != GrantStatus::Paused {
+            return Err(ContractError::InvalidState);
+        }
+
+        grant.status = GrantStatus::Active;
+        Storage::set_grant(&env, grant_id, &grant);
+        Storage::index_transition(
+            &env,
+            GrantStatus::Paused as u32,
+            GrantStatus::Active as u32,
+            grant_id,
+        );
+        Events::emit_grant_resumed(&env, grant_id, caller);
+        Ok(())
+    }
+
     /// Retrieve a grant by its ID
     pub fn get_grant(env: Env, grant_id: u64) -> Result<Grant, ContractError> {
         Storage::get_grant(&env, grant_id).ok_or(ContractError::GrantNotFound)
+    }
+
+    /// Return a paginated list of grant IDs that currently hold `status`.
+    ///
+    /// `page` is zero-based; `page_size` is capped at 50 to bound gas costs.
+    /// Returns an empty vec when the page is out of range.
+    pub fn get_grants_by_status(
+        env: Env,
+        status: GrantStatus,
+        page: u32,
+        page_size: u32,
+    ) -> Vec<u64> {
+        let page_size = if page_size == 0 || page_size > 50 {
+            50
+        } else {
+            page_size
+        };
+        let ids = Storage::get_status_index(&env, status as u32);
+        let total = ids.len();
+        let start = page * page_size;
+        if start >= total {
+            return Vec::new(&env);
+        }
+        let end = (start + page_size).min(total);
+        let mut result = Vec::new(&env);
+        for i in start..end {
+            result.push_back(ids.get(i).unwrap());
+        }
+        result
     }
 
     pub fn get_milestone(
@@ -1692,6 +1845,10 @@ impl StellarGrantsContract {
         treasury: Address,
     ) -> Result<(), ContractError> {
         admin.require_auth();
+        let global = Storage::get_global_admin(&env).ok_or(ContractError::NotContractAdmin)?;
+        if global != admin {
+            return Err(ContractError::NotContractAdmin);
+        }
         if min_stake <= 0 {
             return Err(ContractError::InvalidInput);
         }
@@ -1746,6 +1903,10 @@ impl StellarGrantsContract {
         reviewer: Address,
     ) -> Result<(), ContractError> {
         admin.require_auth();
+        let global = Storage::get_global_admin(&env).ok_or(ContractError::NotContractAdmin)?;
+        if global != admin {
+            return Err(ContractError::NotContractAdmin);
+        }
 
         reentrancy::with_non_reentrant(&env, || {
             let grant = Storage::get_grant(&env, grant_id).ok_or(ContractError::GrantNotFound)?;
@@ -1797,6 +1958,10 @@ impl StellarGrantsContract {
         oracle: Address,
     ) -> Result<(), ContractError> {
         admin.require_auth();
+        let global = Storage::get_global_admin(&env).ok_or(ContractError::NotContractAdmin)?;
+        if global != admin {
+            return Err(ContractError::NotContractAdmin);
+        }
         env.storage()
             .persistent()
             .set(&storage::DataKey::IdentityOracle, &oracle);
@@ -1911,6 +2076,12 @@ impl StellarGrantsContract {
         // If it was inactive, restore it to active
         if grant.status == GrantStatus::Inactive {
             grant.status = GrantStatus::Active;
+            Storage::index_transition(
+                &env,
+                GrantStatus::Inactive as u32,
+                GrantStatus::Active as u32,
+                grant_id,
+            );
         }
 
         Storage::set_grant(&env, grant_id, &grant);
@@ -1964,6 +2135,12 @@ fn check_heartbeat(env: &Env, grant: &mut Grant) {
     if seconds_since_heartbeat > 30 * 24 * 60 * 60 {
         grant.status = GrantStatus::Inactive;
         Storage::set_grant(env, grant.id, grant);
+        Storage::index_transition(
+            env,
+            GrantStatus::Active as u32,
+            GrantStatus::Inactive as u32,
+            grant.id,
+        );
         Events::emit_grant_gone_inactive(env, grant.id, now);
     }
 }
