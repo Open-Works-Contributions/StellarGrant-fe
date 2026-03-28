@@ -65,7 +65,8 @@
                 },
                 {
                   "i128": "500"
-                }
+                },
+                "void"
               ]
             }
           },
@@ -230,6 +231,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "last_heartbeat"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "milestone_amount"
                     },
                     "val": {
@@ -242,6 +251,14 @@
                     },
                     "val": {
                       "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "min_funding"
+                    },
+                    "val": {
+                      "i128": "0"
                     }
                   },
                   {

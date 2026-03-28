@@ -36,6 +36,10 @@ pub enum ContractError {
     AlreadyUpvoted = 27,
     /// Grant cancellation is pending; grace period has not elapsed yet.
     CancellationGracePeriod = 28,
+    HeartbeatMissed = 29,
+    Blacklisted = 30,
+    /// Caller is not the contract global admin for this operation.
+    NotContractAdmin = 31,
 }
 
 #[contracttype]
@@ -117,6 +121,12 @@ pub enum GrantStatus {
     Completed = 3,
     /// Cancellation requested but grace period has not elapsed yet.
     CancellationPending = 4,
+    /// Grant is temporarily paused; no funding, submissions, or payouts allowed.
+    Paused = 5,
+    /// Grant became inactive due to missed heartbeats; can be restored via grant_ping.
+    Inactive = 6,
+    /// Grant is waiting to reach its minimum funding threshold before becoming Active.
+    PendingFunding = 7,
 }
 
 #[contracttype]
@@ -147,6 +157,9 @@ pub struct Grant {
     pub timestamp: u64,
     /// Timestamp when a cancellation was first requested (grace-period cancellation).
     pub cancellation_requested_at: Option<u64>,
+    pub last_heartbeat: u64,
+    /// Minimum escrow balance required before the grant transitions from PendingFunding to Active.
+    pub min_funding: i128,
 }
 
 #[contracttype]

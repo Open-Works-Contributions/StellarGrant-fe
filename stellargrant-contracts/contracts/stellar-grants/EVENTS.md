@@ -22,6 +22,16 @@ This contract emits typed Soroban `#[contractevent]` events with a consistent sc
 - **ContractUpgraded**: Emitted when contract config changes (e.g., admin/council update).
   - Topics: `[contract_id, "ContractUpgraded", 0]`
   - Payload: `event_version`, `grant_id`, `actor`, `component`, `timestamp`
+- `ContractInitialized`
+  - Emitted once when `initialize` completes (after global admin and council are stored).
+  - Fields: `event_version`, `grant_id` (always `0` for contract-level events), `council`, `timestamp`.
+
+- `ContractUpgraded`
+  - Emitted when contract-wide configuration changes without swapping WASM.
+  - Current emit points:
+    - `admin_change` with `component = "admin_changed"`.
+    - `set_council` with `component = "council_updated"`.
+  - Fields: `event_version`, `grant_id`, `actor`, `component`, `timestamp`.
 
 ### Grant Events
 - **GrantCreated**: Grant created.
