@@ -60,6 +60,66 @@
               "key": {
                 "vec": [
                   {
+                    "symbol": "EscrowState"
+                  },
+                  {
+                    "u64": "1"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "map": [
+                  {
+                    "key": {
+                      "symbol": "approvals_count"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "lifecycle"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "mode"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "quorum_ready"
+                    },
+                    "val": {
+                      "bool": false
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 4095
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "key": {
+                "vec": [
+                  {
                     "symbol": "Grant"
                   },
                   {
@@ -104,14 +164,6 @@
                   },
                   {
                     "key": {
-                      "symbol": "metadata"
-                    },
-                    "val": {
-                      "u128": "18446744082299486209"
-                    }
-                  },
-                  {
-                    "key": {
                       "symbol": "milestone_amount"
                     },
                     "val": {
@@ -120,10 +172,26 @@
                   },
                   {
                     "key": {
+                      "symbol": "milestones_paid_out"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "owner"
                     },
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "quorum"
+                    },
+                    "val": {
+                      "u32": 2
                     }
                   },
                   {
@@ -145,6 +213,14 @@
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
                         }
                       ]
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "status"
+                    },
+                    "val": {
+                      "u32": 1
                     }
                   },
                   {
@@ -177,6 +253,14 @@
                     },
                     "val": {
                       "i128": "1000"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "total_milestones"
+                    },
+                    "val": {
+                      "u32": 1
                     }
                   }
                 ]
@@ -220,6 +304,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "approvals"
+                    },
+                    "val": {
+                      "u32": 1
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "deadline"
                     },
                     "val": {
@@ -236,10 +328,10 @@
                   },
                   {
                     "key": {
-                      "symbol": "metadata"
+                      "symbol": "idx"
                     },
                     "val": {
-                      "u128": "18446744078004518912"
+                      "u32": 0
                     }
                   },
                   {
@@ -256,6 +348,22 @@
                     },
                     "val": {
                       "map": []
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rejections"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "state"
+                    },
+                    "val": {
+                      "u32": 1
                     }
                   },
                   {

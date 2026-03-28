@@ -208,14 +208,6 @@
                   },
                   {
                     "key": {
-                      "symbol": "metadata"
-                    },
-                    "val": {
-                      "u128": "36893488151714070529"
-                    }
-                  },
-                  {
-                    "key": {
                       "symbol": "milestone_amount"
                     },
                     "val": {
@@ -224,10 +216,26 @@
                   },
                   {
                     "key": {
+                      "symbol": "milestones_paid_out"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "owner"
                     },
                     "val": {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "quorum"
+                    },
+                    "val": {
+                      "u32": 1
                     }
                   },
                   {
@@ -246,6 +254,14 @@
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                         }
                       ]
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "status"
+                    },
+                    "val": {
+                      "u32": 1
                     }
                   },
                   {
@@ -278,6 +294,14 @@
                     },
                     "val": {
                       "i128": "1000"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "total_milestones"
+                    },
+                    "val": {
+                      "u32": 2
                     }
                   }
                 ]
@@ -372,6 +396,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "approvals"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "deadline"
                     },
                     "val": {
@@ -388,10 +420,10 @@
                   },
                   {
                     "key": {
-                      "symbol": "metadata"
+                      "symbol": "idx"
                     },
                     "val": {
-                      "u128": "0"
+                      "u32": 0
                     }
                   },
                   {
@@ -406,6 +438,22 @@
                     },
                     "val": {
                       "map": []
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rejections"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "state"
+                    },
+                    "val": {
+                      "u32": 0
                     }
                   },
                   {
@@ -481,6 +529,14 @@
                   },
                   {
                     "key": {
+                      "symbol": "approvals"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
                       "symbol": "deadline"
                     },
                     "val": {
@@ -497,10 +553,10 @@
                   },
                   {
                     "key": {
-                      "symbol": "metadata"
+                      "symbol": "idx"
                     },
                     "val": {
-                      "u128": "1"
+                      "u32": 1
                     }
                   },
                   {
@@ -515,6 +571,22 @@
                     },
                     "val": {
                       "map": []
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "rejections"
+                    },
+                    "val": {
+                      "u32": 0
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "state"
+                    },
+                    "val": {
+                      "u32": 0
                     }
                   },
                   {
