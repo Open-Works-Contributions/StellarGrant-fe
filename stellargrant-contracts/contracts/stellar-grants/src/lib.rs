@@ -255,6 +255,11 @@ impl StellarGrantsContract {
     /// * `milestone_amount` - The payout chunk for each milestone.
     /// * `num_milestones` - The number of milestones (up to 100).
     /// * `reviewers` - A list of addresses authorized to approve/reject milestones.
+    /// * `milestone_deadlines` – Optional Vector of timestamps (seconds) for milestone deadlines.
+    /// * `milestone_vesting_periods` – Optional Vector of durations (seconds) for milestone vesting periods.
+    ///
+    /// # Returns
+    /// * `Ok(grant_id)` if successful.
     ///
     /// # Errors
     /// * [`ContractError::InvalidInput`] – if validation of amounts or milestones fails.
@@ -271,6 +276,7 @@ impl StellarGrantsContract {
         reviewers: soroban_sdk::Vec<Address>,
         quorum: u32,
         milestone_deadlines: Option<soroban_sdk::Vec<u64>>,
+        milestone_vesting_periods: Option<soroban_sdk::Vec<u64>>,
     ) -> Result<u64, ContractError> {
         owner.require_auth();
 
@@ -348,6 +354,12 @@ impl StellarGrantsContract {
                 0
             };
 
+            let vesting_period = if let Some(ref vesting) = milestone_vesting_periods {
+                vesting.get(i).unwrap_or(0)
+            } else {
+                0
+            };
+
             let milestone = Milestone {
                 idx: i,
                 description: String::from_str(&env, ""),
@@ -361,6 +373,7 @@ impl StellarGrantsContract {
                 proof_url: None,
                 submission_timestamp: 0,
                 deadline,
+                vesting_period,
                 community_upvotes: 0,
                 community_comments: soroban_sdk::Map::new(&env),
             };
@@ -384,6 +397,7 @@ impl StellarGrantsContract {
         num_milestones: u32,
         reviewers: soroban_sdk::Vec<Address>,
         min_reputation_score: u64,
+        milestone_vesting_periods: Option<soroban_sdk::Vec<u64>>,
     ) -> Result<u64, ContractError> {
         let quorum = (reviewers.len() / 2) + 1;
         let grant_id = Self::grant_create(
@@ -398,6 +412,7 @@ impl StellarGrantsContract {
             reviewers,
             quorum,
             None,
+            milestone_vesting_periods,
         )?;
         Storage::set_grant_min_reputation(&env, grant_id, min_reputation_score);
         Ok(grant_id)
@@ -433,6 +448,8 @@ impl StellarGrantsContract {
         num_milestones: u32,
         reviewers: soroban_sdk::Vec<Address>,
         multisig_signers: soroban_sdk::Vec<Address>,
+        milestone_deadlines: Option<soroban_sdk::Vec<u64>>,
+        milestone_vesting_periods: Option<soroban_sdk::Vec<u64>>,
     ) -> Result<u64, ContractError> {
         if multisig_signers.is_empty() {
             return Err(ContractError::InvalidInput);
@@ -450,7 +467,8 @@ impl StellarGrantsContract {
             num_milestones,
             reviewers,
             quorum,
-            None,
+            milestone_deadlines,
+            milestone_vesting_periods,
         )?;
 
         Storage::set_escrow_state(
@@ -969,9 +987,9 @@ impl StellarGrantsContract {
         escrow_state.quorum_ready = true;
         Storage::set_escrow_state(env, grant_id, &escrow_state);
 
-        Events::emit_payee_receipt(env, grant_id, grant.owner.clone(), total_paid);
+        Events::emit_payee_receipt(env, grant_id, grant.owner.clone(), total_payout_committed);
 
-        Events::emit_grant_completed(env, grant_id, total_paid, remaining_balance);
+        Events::emit_grant_completed(env, grant_id, total_payout_committed, remaining_balance);
         Ok(())
     }
 

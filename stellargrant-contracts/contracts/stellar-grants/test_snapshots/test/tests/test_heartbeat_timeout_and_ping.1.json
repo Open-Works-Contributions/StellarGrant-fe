@@ -46,6 +46,7 @@
                 {
                   "u32": 1
                 },
+                "void",
                 "void"
               ]
             }
@@ -511,7 +512,7 @@
                       "symbol": "state"
                     },
                     "val": {
-                      "u32": 6
+                      "u32": 7
                     }
                   },
                   {
@@ -528,6 +529,14 @@
                     },
                     "val": {
                       "u64": "2678401"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "vesting_period"
+                    },
+                    "val": {
+                      "u64": "0"
                     }
                   },
                   {
@@ -666,6 +675,14 @@
                   {
                     "key": {
                       "symbol": "submission_timestamp"
+                    },
+                    "val": {
+                      "u64": "0"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "vesting_period"
                     },
                     "val": {
                       "u64": "0"

@@ -38,6 +38,7 @@ pub enum ContractError {
     CancellationGracePeriod = 28,
     HeartbeatMissed = 29,
     Blacklisted = 30,
+    VestingPeriodNotElapsed = 31,
 }
 
 #[contracttype]
@@ -79,6 +80,8 @@ pub enum MilestoneState {
     Resolved = 6,
     /// Open for community upvotes / comments before reviewer voting begins.
     CommunityReview = 7,
+    /// Milestone is approved but payout is vesting (time-locked).
+    VestingPending = 8,
 }
 
 #[contracttype]
@@ -98,6 +101,8 @@ pub struct Milestone {
     pub deadline: u64,
     /// Number of community upvotes received during the CommunityReview period.
     pub community_upvotes: u32,
+    /// Number of seconds the payout must vest before being claimable.
+    pub vesting_period: u64,
     /// One comment per address recorded during the CommunityReview period.
     pub community_comments: Map<Address, String>,
 }

@@ -71,7 +71,9 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
                     }
                   ]
-                }
+                },
+                "void",
+                "void"
               ]
             }
           },
