@@ -64,6 +64,59 @@ impl StellarGrantsContract {
         Ok(())
     }
 
+    /// Approves a milestone when quorum is reached and automatically triggers token payout to the grant recipient.
+    pub fn milestone_approve(
+        env: Env,
+        grant_id: u64,
+        milestone_idx: u32,
+    ) -> Result<(), ContractError> {
+        let mut grant = Storage::get_grant(&env, grant_id).ok_or(ContractError::GrantNotFound)?;
+        let mut milestone = Storage::get_milestone(&env, grant_id, milestone_idx)
+            .ok_or(ContractError::MilestoneNotFound)?;
+
+        if milestone.state == MilestoneState::Approved {
+            return Err(ContractError::MilestoneAlreadyApproved);
+        }
+
+        if milestone.state != MilestoneState::Submitted {
+            return Err(ContractError::InvalidState);
+        }
+
+        if milestone.approvals < grant.quorum {
+            return Err(ContractError::QuorumNotReached);
+        }
+
+        let amount = milestone.amount;
+        if grant.escrow_balance < amount {
+            return Err(ContractError::InsufficientBalance);
+        }
+
+        // State Update
+        milestone.state = MilestoneState::Approved;
+        milestone.status_updated_at = env.ledger().timestamp();
+
+        let recipient = grant.owner.clone();
+
+        // Payout Execution & balance deduction
+        grant.escrow_balance = grant
+            .escrow_balance
+            .checked_sub(amount)
+            .ok_or(ContractError::InsufficientBalance)?;
+        grant.milestones_paid_out += 1;
+
+        Storage::set_milestone(&env, grant_id, milestone_idx, &milestone);
+        Storage::set_grant(&env, grant_id, &grant);
+
+        let token_client = token::Client::new(&env, &grant.token);
+        token_client.transfer(&env.current_contract_address(), &recipient, &amount);
+
+        // Events
+        Events::emit_milestone_approved(&env, grant_id, milestone_idx, amount, recipient.clone());
+        Events::emit_payout_executed(&env, grant_id, recipient, amount);
+
+        Ok(())
+    }
+
     /// Committee resolves a disputed milestone. Only callable by council.
     pub fn resolve_dispute(
         env: Env,

@@ -40,6 +40,7 @@ pub enum ContractError {
     Blacklisted = 30,
     /// Caller is not the contract global admin for this operation.
     NotContractAdmin = 31,
+    InsufficientBalance = 32,
 }
 
 #[contracttype]
