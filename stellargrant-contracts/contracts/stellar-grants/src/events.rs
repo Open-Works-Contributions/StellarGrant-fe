@@ -1,5 +1,5 @@
 use crate::types::MilestoneState;
-use soroban_sdk::{contractevent, Address, Env, String};
+use soroban_sdk::{contractevent, Address, BytesN, Env, String};
 
 const EVENT_VERSION: u32 = 1;
 const GLOBAL_EVENT_GRANT_ID: u64 = 0;
@@ -43,6 +43,27 @@ pub struct MilestonePaid {
     pub event_version: u32,
     pub grant_id: u64,
     pub milestone_idx: u32,
+    pub amount: i128,
+    pub timestamp: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MilestoneApproved {
+    pub event_version: u32,
+    pub grant_id: u64,
+    pub milestone_idx: u32,
+    pub payout_amount: i128,
+    pub recipient: Address,
+    pub timestamp: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PayoutExecuted {
+    pub event_version: u32,
+    pub grant_id: u64,
+    pub recipient: Address,
     pub amount: i128,
     pub timestamp: u64,
 }
@@ -181,6 +202,17 @@ pub struct ContractUpgraded {
     pub timestamp: u64,
 }
 
+#[contractevent]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ContractWasmUpgraded {
+    pub event_version: u32,
+    pub grant_id: u64,
+    pub admin: Address,
+    pub new_wasm_hash: BytesN<32>,
+    pub new_storage_version: u32,
+    pub timestamp: u64,
+}
+
 pub struct Events;
 
 #[contractevent]
@@ -228,6 +260,23 @@ impl Events {
             grant_id: GLOBAL_EVENT_GRANT_ID,
             actor,
             component,
+            timestamp: env.ledger().timestamp(),
+        };
+        event.publish(env);
+    }
+
+    pub fn emit_contract_wasm_upgraded(
+        env: &Env,
+        admin: Address,
+        new_wasm_hash: BytesN<32>,
+        new_storage_version: u32,
+    ) {
+        let event = ContractWasmUpgraded {
+            event_version: EVENT_VERSION,
+            grant_id: GLOBAL_EVENT_GRANT_ID,
+            admin,
+            new_wasm_hash,
+            new_storage_version,
             timestamp: env.ledger().timestamp(),
         };
         event.publish(env);
@@ -463,6 +512,35 @@ impl Events {
             event_version: EVENT_VERSION,
             grant_id,
             milestone_idx,
+            amount,
+            timestamp: env.ledger().timestamp(),
+        };
+        event.publish(env);
+    }
+
+    pub fn emit_milestone_approved(
+        env: &Env,
+        grant_id: u64,
+        milestone_idx: u32,
+        payout_amount: i128,
+        recipient: Address,
+    ) {
+        let event = MilestoneApproved {
+            event_version: EVENT_VERSION,
+            grant_id,
+            milestone_idx,
+            payout_amount,
+            recipient,
+            timestamp: env.ledger().timestamp(),
+        };
+        event.publish(env);
+    }
+
+    pub fn emit_payout_executed(env: &Env, grant_id: u64, recipient: Address, amount: i128) {
+        let event = PayoutExecuted {
+            event_version: EVENT_VERSION,
+            grant_id,
+            recipient,
             amount,
             timestamp: env.ledger().timestamp(),
         };

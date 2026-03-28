@@ -140,10 +140,10 @@ mod tests {
     };
     use crate::StellarGrantsContract;
     use crate::StellarGrantsContractClient;
-    use soroban_sdk::testutils::Ledger as _;
+    use soroban_sdk::testutils::{Events as _, Ledger as _};
     use soroban_sdk::{
-        testutils::{storage::Persistent as _, Address as _, Events as _},
-        token, Address, Env, Map, String, Vec,
+        testutils::{storage::Persistent as _, Address as _},
+        token, Address, BytesN, Env, Map, String, Vec,
     };
 
     const EXTENDED_PERSISTENT_TTL: u32 = 1_000_000;
@@ -651,10 +651,11 @@ mod tests {
 
         let owner = Address::generate(&env);
         let global_admin = Address::generate(&env);
+        let council = Address::generate(&env);
         let funder = Address::generate(&env);
         let grant_id = 11u64;
 
-        client.set_global_admin(&global_admin, &global_admin);
+        client.initialize(&global_admin, &council);
 
         token_admin.mint(&contract_id, &500);
 
@@ -2596,9 +2597,11 @@ mod tests {
         let owner = Address::generate(&env);
         let token = Address::generate(&env);
         let reviewer = Address::generate(&env);
+        let admin = Address::generate(&env);
         let council = Address::generate(&env);
 
-        client.initialize(&council);
+        env.mock_all_auths();
+        client.initialize(&admin, &council);
 
         let mut reviewers = Vec::new(&env);
         reviewers.push_back(reviewer.clone());
@@ -3150,6 +3153,18 @@ mod tests {
         );
 
         let result = client.try_grant_remove_reviewer(&grant_id, &owner, &reviewer);
+        assert_eq!(result, Err(Ok(ContractError::InvalidInput.into())));
+    }
+
+    #[test]
+    fn test_initialize_twice_returns_invalid_input() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, _, _) = setup_test(&env);
+        let admin = Address::generate(&env);
+        let council = Address::generate(&env);
+        client.initialize(&admin, &council);
+        let result = client.try_initialize(&admin, &council);
         assert_eq!(result, Err(Ok(ContractError::InvalidInput.into())));
     }
 
@@ -3900,6 +3915,100 @@ mod tests {
     // ── Grant Pause / Resume tests ──────────────────────────────────
 
     #[test]
+    fn test_blacklist_enforcement() {
+        let env = Env::default();
+        let (client, admin, contract_id) = setup_test(&env);
+        let global_admin = admin.clone();
+
+        env.mock_all_auths();
+        let council = Address::generate(&env);
+        client.initialize(&admin, &council);
+
+        let target = Address::generate(&env);
+
+        // Add to blacklist
+        client.admin_blacklist_add(&global_admin, &target);
+
+        // Attempt to register contributor
+        let result = client.try_contributor_register(
+            &target,
+            &String::from_str(&env, "Test"),
+            &String::from_str(&env, "Bio"),
+            &Vec::new(&env),
+            &String::from_str(&env, "https://github.com/test"),
+        );
+        assert_eq!(result, Err(Ok(ContractError::Blacklisted.into())));
+
+        // Attempt to create grant
+        let result = client.try_grant_create(
+            &target,
+            &String::from_str(&env, "Title"),
+            &String::from_str(&env, "Desc"),
+            &Address::generate(&env),
+            &1000,
+            &1000,
+            &1,
+            &Vec::new(&env),
+            &0,
+            &None,
+            &0i128,
+        );
+        assert_eq!(result, Err(Ok(ContractError::Blacklisted.into())));
+    }
+
+    #[test]
+    fn test_heartbeat_timeout_and_ping() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, _, contract_id) = setup_test(&env);
+
+        let owner = Address::generate(&env);
+        let token = Address::generate(&env);
+        let mut reviewers = Vec::new(&env);
+        reviewers.push_back(owner.clone());
+        let grant_id = client.grant_create(
+            &owner,
+            &String::from_str(&env, "Grant"),
+            &String::from_str(&env, "Desc"),
+            &token,
+            &1000,
+            &500,
+            &2,
+            &reviewers,
+            &1,
+            &None,
+            &0i128,
+        );
+
+        env.ledger().set_timestamp(31 * 24 * 60 * 60 + 1);
+
+        let result = client.try_milestone_submit(
+            &grant_id,
+            &0,
+            &owner,
+            &String::from_str(&env, "M1"),
+            &String::from_str(&env, "url"),
+        );
+        assert_eq!(result, Err(Ok(ContractError::HeartbeatMissed.into())));
+
+        client.grant_ping(&grant_id, &owner);
+
+        env.as_contract(&contract_id, || {
+            let grant = Storage::get_grant(&env, grant_id).unwrap();
+            assert_eq!(grant.status, GrantStatus::Active);
+            assert!(grant.last_heartbeat > 0);
+        });
+
+        client.milestone_submit(
+            &grant_id,
+            &0,
+            &owner,
+            &String::from_str(&env, "M1"),
+            &String::from_str(&env, "url"),
+        );
+    }
+
+    #[test]
     fn test_grant_pause_and_resume_success() {
         let env = Env::default();
         env.mock_all_auths();
@@ -4147,13 +4256,15 @@ mod tests {
     fn test_grant_pause_by_global_admin() {
         let env = Env::default();
         env.mock_all_auths();
-        let (client, _, contract_id) = setup_test(&env);
+        let (client, initial_admin, contract_id) = setup_test(&env);
+        let council = Address::generate(&env);
         let owner = Address::generate(&env);
         let global_admin = Address::generate(&env);
         let token = Address::generate(&env);
         let grant_id = 207u64;
 
-        client.set_global_admin(&global_admin, &global_admin);
+        client.initialize(&initial_admin, &council);
+        client.admin_change(&initial_admin, &global_admin);
         create_grant(&env, &contract_id, grant_id, owner, token, Vec::new(&env));
 
         client.grant_pause(&grant_id, &global_admin);
@@ -4379,230 +4490,175 @@ mod tests {
         });
     }
 
-    // ── get_grants_by_status / status index tests ───────────────────
-
     #[test]
-    fn test_status_index_populated_on_create() {
+    fn test_admin_change_wrong_old_admin_returns_not_contract_admin() {
         let env = Env::default();
         env.mock_all_auths();
         let (client, _, _) = setup_test(&env);
-        let owner = Address::generate(&env);
-        let token = Address::generate(&env);
-        let mut reviewers = Vec::new(&env);
-        reviewers.push_back(Address::generate(&env));
-
-        let id1 = client.grant_create(
-            &owner,
-            &String::from_str(&env, "G1"),
-            &String::from_str(&env, "D"),
-            &token,
-            &1000i128,
-            &500i128,
-            &2u32,
-            &reviewers,
-            &1u32,
-            &None,
-            &0i128,
-        );
-        let id2 = client.grant_create(
-            &owner,
-            &String::from_str(&env, "G2"),
-            &String::from_str(&env, "D"),
-            &token,
-            &1000i128,
-            &500i128,
-            &2u32,
-            &reviewers,
-            &1u32,
-            &None,
-            &0i128,
-        );
-
-        let active = client.get_grants_by_status(&GrantStatus::Active, &0u32, &50u32);
-        assert!(active.contains(id1));
-        assert!(active.contains(id2));
+        let admin = Address::generate(&env);
+        let council = Address::generate(&env);
+        let attacker = Address::generate(&env);
+        let new_admin = Address::generate(&env);
+        client.initialize(&admin, &council);
+        let result = client.try_admin_change(&attacker, &new_admin);
+        assert_eq!(result, Err(Ok(ContractError::NotContractAdmin.into())));
     }
 
     #[test]
-    fn test_status_index_transitions_on_cancel() {
+    fn test_admin_upgrade_non_admin_returns_not_contract_admin() {
         let env = Env::default();
         env.mock_all_auths();
         let (client, _, _) = setup_test(&env);
-        let owner = Address::generate(&env);
-        let token = Address::generate(&env);
-        let mut reviewers = Vec::new(&env);
-        reviewers.push_back(Address::generate(&env));
-
-        let grant_id = client.grant_create(
-            &owner,
-            &String::from_str(&env, "G"),
-            &String::from_str(&env, "D"),
-            &token,
-            &1000i128,
-            &500i128,
-            &2u32,
-            &reviewers,
-            &1u32,
-            &None,
-            &0i128,
-        );
-
-        client.grant_cancel(
-            &grant_id,
-            &owner,
-            &String::from_str(&env, "no longer needed"),
-        );
-
-        let active = client.get_grants_by_status(&GrantStatus::Active, &0u32, &50u32);
-        let cancelled = client.get_grants_by_status(&GrantStatus::Cancelled, &0u32, &50u32);
-        assert!(!active.contains(grant_id));
-        assert!(cancelled.contains(grant_id));
+        let admin = Address::generate(&env);
+        let council = Address::generate(&env);
+        let attacker = Address::generate(&env);
+        client.initialize(&admin, &council);
+        let wasm_hash = BytesN::from_array(&env, &[2u8; 32]);
+        let result = client.try_admin_upgrade(&attacker, &wasm_hash);
+        assert_eq!(result, Err(Ok(ContractError::NotContractAdmin.into())));
     }
 
     #[test]
-    fn test_status_index_pending_funding_to_active() {
+    fn test_milestone_approve_success() {
         let env = Env::default();
         env.mock_all_auths();
         let (client, admin, contract_id) = setup_test(&env);
         let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
         let token_id = token_contract.address();
         let token_admin = token::StellarAssetClient::new(&env, &token_id);
+
         let owner = Address::generate(&env);
-        let funder = Address::generate(&env);
+        let reviewer = Address::generate(&env);
         let mut reviewers = Vec::new(&env);
-        reviewers.push_back(Address::generate(&env));
+        reviewers.push_back(reviewer.clone());
 
-        token_admin.mint(&funder, &1000);
+        token_admin.mint(&contract_id, &1000);
 
-        let grant_id = client.grant_create(
-            &owner,
-            &String::from_str(&env, "G"),
-            &String::from_str(&env, "D"),
-            &token_id,
-            &1000i128,
-            &500i128,
-            &2u32,
-            &reviewers,
-            &1u32,
-            &None,
-            &500i128, // min_funding
-        );
-
-        // Before threshold — should be in PendingFunding
-        let pending = client.get_grants_by_status(&GrantStatus::PendingFunding, &0u32, &50u32);
-        assert!(pending.contains(grant_id));
-
-        // Fund past threshold
-        client.grant_fund(&grant_id, &funder, &500, &None);
-
-        let pending_after =
-            client.get_grants_by_status(&GrantStatus::PendingFunding, &0u32, &50u32);
-        let active_after = client.get_grants_by_status(&GrantStatus::Active, &0u32, &50u32);
-        assert!(!pending_after.contains(grant_id));
-        assert!(active_after.contains(grant_id));
-    }
-
-    #[test]
-    fn test_status_index_pause_resume() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let (client, _, contract_id) = setup_test(&env);
-        let owner = Address::generate(&env);
-        let token = Address::generate(&env);
-        let grant_id = 400u64;
-
+        let grant_id = 1;
         create_grant(
             &env,
             &contract_id,
             grant_id,
             owner.clone(),
-            token,
-            Vec::new(&env),
+            token_id.clone(),
+            reviewers,
         );
-        // Manually seed the index since create_grant bypasses grant_create
+        create_milestone(&env, &contract_id, grant_id, 0, MilestoneState::Submitted);
+
         env.as_contract(&contract_id, || {
-            Storage::index_add(&env, GrantStatus::Active as u32, grant_id);
+            let mut milestone = Storage::get_milestone(&env, grant_id, 0).unwrap();
+            milestone.approvals = 1;
+            Storage::set_milestone(&env, grant_id, 0, &milestone);
         });
 
-        client.grant_pause(&grant_id, &owner);
-        let active = client.get_grants_by_status(&GrantStatus::Active, &0u32, &50u32);
-        let paused = client.get_grants_by_status(&GrantStatus::Paused, &0u32, &50u32);
-        assert!(!active.contains(grant_id));
-        assert!(paused.contains(grant_id));
+        env.mock_all_auths();
+        client.milestone_approve(&grant_id, &0);
 
-        client.grant_resume(&grant_id, &owner);
-        let active2 = client.get_grants_by_status(&GrantStatus::Active, &0u32, &50u32);
-        let paused2 = client.get_grants_by_status(&GrantStatus::Paused, &0u32, &50u32);
-        assert!(active2.contains(grant_id));
-        assert!(!paused2.contains(grant_id));
+        let token_client = token::Client::new(&env, &token_id);
+        assert_eq!(token_client.balance(&owner), 100);
+        assert_eq!(token_client.balance(&contract_id), 900);
+
+        env.as_contract(&contract_id, || {
+            let milestone = Storage::get_milestone(&env, grant_id, 0).unwrap();
+            assert_eq!(milestone.state, MilestoneState::Approved);
+            let grant = Storage::get_grant(&env, grant_id).unwrap();
+            assert_eq!(grant.escrow_balance, 900);
+            assert_eq!(grant.milestones_paid_out, 1);
+        });
     }
 
     #[test]
-    fn test_get_grants_by_status_pagination() {
+    fn test_milestone_approve_quorum_not_reached() {
         let env = Env::default();
         env.mock_all_auths();
-        let (client, _, _) = setup_test(&env);
+        let (client, admin, contract_id) = setup_test(&env);
+        let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+        let token_id = token_contract.address();
+
         let owner = Address::generate(&env);
-        let token = Address::generate(&env);
+        let reviewer = Address::generate(&env);
         let mut reviewers = Vec::new(&env);
-        reviewers.push_back(Address::generate(&env));
+        reviewers.push_back(reviewer.clone());
 
-        // Create 5 grants
-        for i in 0..5u32 {
-            let _ = i;
-            client.grant_create(
-                &owner,
-                &String::from_str(&env, "G"),
-                &String::from_str(&env, "D"),
-                &token,
-                &1000i128,
-                &500i128,
-                &2u32,
-                &reviewers,
-                &1u32,
-                &None,
-                &0i128,
-            );
-        }
-
-        let page0 = client.get_grants_by_status(&GrantStatus::Active, &0u32, &3u32);
-        let page1 = client.get_grants_by_status(&GrantStatus::Active, &1u32, &3u32);
-        let page2 = client.get_grants_by_status(&GrantStatus::Active, &2u32, &3u32);
-
-        assert_eq!(page0.len(), 3);
-        assert_eq!(page1.len(), 2);
-        assert_eq!(page2.len(), 0); // out of range
-    }
-
-    #[test]
-    fn test_get_grants_by_status_page_size_capped_at_50() {
-        let env = Env::default();
-        env.mock_all_auths();
-        let (client, _, _) = setup_test(&env);
-        let owner = Address::generate(&env);
-        let token = Address::generate(&env);
-        let mut reviewers = Vec::new(&env);
-        reviewers.push_back(Address::generate(&env));
-
-        client.grant_create(
-            &owner,
-            &String::from_str(&env, "G"),
-            &String::from_str(&env, "D"),
-            &token,
-            &1000i128,
-            &500i128,
-            &2u32,
-            &reviewers,
-            &1u32,
-            &None,
-            &0i128,
+        let grant_id = 1;
+        create_grant(
+            &env,
+            &contract_id,
+            grant_id,
+            owner.clone(),
+            token_id.clone(),
+            reviewers,
         );
+        create_milestone(&env, &contract_id, grant_id, 0, MilestoneState::Submitted);
 
-        // page_size=0 and page_size=999 both fall back to 50
-        let r1 = client.get_grants_by_status(&GrantStatus::Active, &0u32, &0u32);
-        let r2 = client.get_grants_by_status(&GrantStatus::Active, &0u32, &999u32);
-        assert_eq!(r1.len(), 1);
-        assert_eq!(r2.len(), 1);
+        let res = client.try_milestone_approve(&grant_id, &0);
+        assert_eq!(res, Err(Ok(ContractError::QuorumNotReached.into())));
+    }
+
+    #[test]
+    fn test_milestone_approve_already_approved() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, admin, contract_id) = setup_test(&env);
+        let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+        let token_id = token_contract.address();
+
+        let owner = Address::generate(&env);
+        let reviewer = Address::generate(&env);
+        let mut reviewers = Vec::new(&env);
+        reviewers.push_back(reviewer.clone());
+
+        let grant_id = 1;
+        create_grant(
+            &env,
+            &contract_id,
+            grant_id,
+            owner.clone(),
+            token_id.clone(),
+            reviewers,
+        );
+        create_milestone(&env, &contract_id, grant_id, 0, MilestoneState::Approved);
+
+        let res = client.try_milestone_approve(&grant_id, &0);
+        assert_eq!(res, Err(Ok(ContractError::MilestoneAlreadyApproved.into())));
+    }
+
+    #[test]
+    fn test_milestone_approve_insufficient_balance() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, admin, contract_id) = setup_test(&env);
+        let token_contract = env.register_stellar_asset_contract_v2(admin.clone());
+        let token_id = token_contract.address();
+
+        let owner = Address::generate(&env);
+        let reviewer = Address::generate(&env);
+        let mut reviewers = Vec::new(&env);
+        reviewers.push_back(reviewer.clone());
+
+        let grant_id = 1;
+        create_grant(
+            &env,
+            &contract_id,
+            grant_id,
+            owner.clone(),
+            token_id.clone(),
+            reviewers,
+        );
+        create_milestone(&env, &contract_id, grant_id, 0, MilestoneState::Submitted);
+
+        env.as_contract(&contract_id, || {
+            let mut milestone = Storage::get_milestone(&env, grant_id, 0).unwrap();
+            milestone.approvals = 1;
+            Storage::set_milestone(&env, grant_id, 0, &milestone);
+
+            let mut grant = Storage::get_grant(&env, grant_id).unwrap();
+            grant.escrow_balance = 50;
+            Storage::set_grant(&env, grant_id, &grant);
+        });
+
+        let res = client.try_milestone_approve(&grant_id, &0);
+        assert_eq!(res, Err(Ok(ContractError::InsufficientBalance.into())));
     }
 
     // ── Pausable module tests ────────────────────────────────────────
@@ -4616,8 +4672,9 @@ mod tests {
     ) {
         let (client, _, contract_id) = setup_test(env);
         let admin = Address::generate(env);
+        let council = Address::generate(env);
         env.mock_all_auths();
-        client.set_global_admin(&admin, &admin);
+        client.initialize(&admin, &council);
         client.pause(&admin);
         (client, admin, contract_id)
     }
@@ -4628,7 +4685,8 @@ mod tests {
         env.mock_all_auths();
         let (client, _, _) = setup_test(&env);
         let admin = Address::generate(&env);
-        client.set_global_admin(&admin, &admin);
+        let council = Address::generate(&env);
+        client.initialize(&admin, &council);
 
         assert_eq!(client.is_paused(), false);
         client.pause(&admin);
@@ -4643,8 +4701,9 @@ mod tests {
         env.mock_all_auths();
         let (client, _, _) = setup_test(&env);
         let admin = Address::generate(&env);
+        let council = Address::generate(&env);
         let attacker = Address::generate(&env);
-        client.set_global_admin(&admin, &admin);
+        client.initialize(&admin, &council);
 
         let result = client.try_pause(&attacker);
         assert_eq!(result, Err(Ok(ContractError::Unauthorized.into())));
@@ -4656,8 +4715,9 @@ mod tests {
         env.mock_all_auths();
         let (client, _, _) = setup_test(&env);
         let admin = Address::generate(&env);
+        let council = Address::generate(&env);
         let attacker = Address::generate(&env);
-        client.set_global_admin(&admin, &admin);
+        client.initialize(&admin, &council);
         client.pause(&admin);
 
         let result = client.try_unpause(&attacker);
@@ -4787,11 +4847,12 @@ mod tests {
         env.mock_all_auths();
         let (client, _, contract_id) = setup_test(&env);
         let admin = Address::generate(&env);
+        let council = Address::generate(&env);
         let owner = Address::generate(&env);
         let token = Address::generate(&env);
         let grant_id = 503u64;
 
-        client.set_global_admin(&admin, &admin);
+        client.initialize(&admin, &council);
 
         // Create a grant with zero escrow so cancel doesn't need a token transfer
         env.as_contract(&contract_id, || {

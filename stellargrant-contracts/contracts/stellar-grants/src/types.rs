@@ -38,8 +38,11 @@ pub enum ContractError {
     CancellationGracePeriod = 28,
     HeartbeatMissed = 29,
     Blacklisted = 30,
+    /// Caller is not the contract global admin for this operation.
+    NotContractAdmin = 31,
+    InsufficientBalance = 32,
     /// Contract is globally paused; all state-modifying operations are blocked.
-    ContractPaused = 31,
+    ContractPaused = 33,
 }
 
 #[contracttype]
