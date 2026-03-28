@@ -887,7 +887,8 @@ mod tests {
                     submission_timestamp: 0,
                     deadline: 0,
                     community_upvotes: 0,
-                    vesting_period: 0, community_comments: Map::new(&env),
+                    vesting_period: 0,
+                    community_comments: Map::new(&env),
                 };
                 Storage::set_milestone(&env, grant_id, i, &milestone);
             }
@@ -969,7 +970,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &m1);
 
@@ -987,7 +989,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 1, &m2);
         });
@@ -1053,7 +1056,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &m1);
         });
@@ -1095,7 +1099,9 @@ mod tests {
             &500,
             &2,
             &reviewers,
-            &multisig, &None, &None,
+            &multisig,
+            &None,
+            &None,
         );
 
         let funder = Address::generate(&env);
@@ -1118,7 +1124,8 @@ mod tests {
                     submission_timestamp: 0,
                     deadline: 0,
                     community_upvotes: 0,
-                    vesting_period: 0, community_comments: Map::new(&env),
+                    vesting_period: 0,
+                    community_comments: Map::new(&env),
                 };
                 Storage::set_milestone(&env, grant_id, i, &milestone);
             }
@@ -1163,7 +1170,9 @@ mod tests {
             &500,
             &2,
             &reviewers,
-            &multisig, &None, &None,
+            &multisig,
+            &None,
+            &None,
         );
 
         let funder = Address::generate(&env);
@@ -1185,7 +1194,8 @@ mod tests {
                     submission_timestamp: 0,
                     deadline: 0,
                     community_upvotes: 0,
-                    vesting_period: 0, community_comments: Map::new(&env),
+                    vesting_period: 0,
+                    community_comments: Map::new(&env),
                 };
                 Storage::set_milestone(&env, grant_id, i, &milestone);
             }
@@ -1229,7 +1239,9 @@ mod tests {
             &500,
             &1,
             &reviewers,
-            &multisig, &None, &None,
+            &multisig,
+            &None,
+            &None,
         );
 
         let result = client.try_sign_release(&grant_id, &attacker);
@@ -1347,7 +1359,8 @@ mod tests {
             &1,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
 
         token_admin.mint(&funder, &500);
@@ -1368,7 +1381,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &milestone);
         });
@@ -1608,7 +1622,8 @@ mod tests {
                     submission_timestamp: 0,
                     deadline: 0,
                     community_upvotes: 0,
-                    vesting_period: 0, community_comments: Map::new(&env),
+                    vesting_period: 0,
+                    community_comments: Map::new(&env),
                 };
                 Storage::set_milestone(&env, grant_id, idx, &milestone);
             }
@@ -2170,7 +2185,8 @@ mod tests {
             &2u32,     // num_milestones
             &reviewers,
             &1u32,
-            &None, &None, // milestone_deadlines
+            &None,
+            &None, // milestone_deadlines
         );
 
         assert_eq!(grant_id, 1);
@@ -2211,7 +2227,8 @@ mod tests {
             &2u32,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
         assert_eq!(res1, Err(Ok(ContractError::InvalidInput.into())));
 
@@ -2226,7 +2243,8 @@ mod tests {
             &2u32,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
         assert_eq!(res2, Err(Ok(ContractError::InvalidInput.into())));
     }
@@ -2255,7 +2273,8 @@ mod tests {
             &0u32,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
         assert_eq!(res1, Err(Ok(ContractError::InvalidInput.into())));
 
@@ -2270,7 +2289,8 @@ mod tests {
             &101u32,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
         assert_eq!(res2, Err(Ok(ContractError::InvalidInput.into())));
     }
@@ -2298,7 +2318,8 @@ mod tests {
             &2u32,
             &reviewers,
             &2u32,
-            &None, &None,
+            &None,
+            &None,
         );
         assert_eq!(res, Err(Ok(ContractError::InvalidInput.into())));
     }
@@ -2328,7 +2349,8 @@ mod tests {
             &2u32,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
         assert_eq!(res, Err(Ok(ContractError::InvalidInput.into())));
     }
@@ -2356,7 +2378,8 @@ mod tests {
             &2u32,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
         assert!(res.is_err());
     }
@@ -2384,7 +2407,8 @@ mod tests {
             &2u32,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
         assert_eq!(created, 1);
 
@@ -2423,7 +2447,8 @@ mod tests {
             &2u32,
             &reviewers,
             &1u32,
-            &None, &None,
+            &None,
+            &None,
         );
 
         env.as_contract(&contract_id, || {
@@ -2859,7 +2884,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 1_000, // deadline at timestamp 1000
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, milestone_idx, &milestone);
         });
@@ -3365,7 +3391,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &milestone);
         });
@@ -3412,7 +3439,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &milestone);
         });
@@ -3460,7 +3488,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &milestone);
         });
@@ -3506,7 +3535,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &milestone);
         });
@@ -3549,7 +3579,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &milestone);
         });
@@ -3628,7 +3659,8 @@ mod tests {
                 submission_timestamp: 0,
                 deadline: 0,
                 community_upvotes: 0,
-                vesting_period: 0, community_comments: Map::new(&env),
+                vesting_period: 0,
+                community_comments: Map::new(&env),
             };
             Storage::set_milestone(&env, grant_id, 0, &milestone);
         });
@@ -3915,7 +3947,8 @@ mod tests {
             &1,
             &Vec::new(&env),
             &0,
-            &None, &None,
+            &None,
+            &None,
         );
         assert_eq!(result, Err(Ok(ContractError::Blacklisted.into())));
     }
@@ -3940,7 +3973,8 @@ mod tests {
             &2,
             &reviewers,
             &1,
-            &None, &None,
+            &None,
+            &None,
         );
 
         // Fast-forward 31 days
@@ -3998,7 +4032,8 @@ mod tests {
             &2,
             &reviewers,
             &1,
-            &None, &None,
+            &None,
+            &None,
         );
 
         let funder = Address::generate(&env);
